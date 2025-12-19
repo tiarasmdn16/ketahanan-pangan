@@ -1,0 +1,949 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="initial-scale=1,user-scalable=no,maximum-scale=1,width=device-width" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+
+  <link rel="stylesheet" href="css/leaflet.css" />
+  <link rel="stylesheet" href="css/L.Control.Layers.Tree.css" />
+  <link rel="stylesheet" href="css/qgis2web.css" />
+  <link rel="stylesheet" href="css/fontawesome-all.min.css" />
+  <link rel="stylesheet" href="css/leaflet.photon.css" />
+
+  <title>PETA KETAHANAN DAN KERENTANAN PANGAN KABUPATEN KULON PROGO</title>
+
+  <style>
+    :root{
+      --header-h: 72px;
+      --sidebar-w: 350px;
+      --border: rgba(0,0,0,.10);
+    }
+
+    html, body { height: 100%; margin:0; }
+
+    #map{
+      position: fixed;
+      top: var(--header-h);
+      left: var(--sidebar-w);
+      right: 0;
+      bottom: 0;
+      width: auto !important;
+      height: auto !important;
+      padding: 0;
+      margin: 0;
+    }
+
+    #appHeader{
+      position: fixed;
+      top:0; left:0; right:0;
+      height: var(--header-h);
+      background: #dfeef7;
+      border-bottom: 1px solid var(--border);
+      display:flex;
+      align-items:center;
+      justify-content: space-between;
+      padding: 0 18px;
+      z-index: 3000;
+      box-sizing: border-box;
+    }
+    .appLeft{ display:flex; align-items:center; gap:10px; }
+    .appTitle{ font-weight: 900; font-size: 22px; letter-spacing: .3px; line-height:1.1; }
+    .appLogo{ width: 60px; height: 60px; object-fit: contain; }
+
+    #appSidebar{
+      position: fixed;
+      top: var(--header-h);
+      left: 0;
+      bottom: 0;
+      width: var(--sidebar-w);
+      background: #fff;
+      border-right: 1px solid var(--border);
+      z-index: 2500;
+      box-sizing: border-box;
+      display:flex;
+      flex-direction: column;
+    }
+    .sidebarHead{
+      padding: 14px 14px 8px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .sidebarHeadTitle{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      font-size: 18px;
+      font-weight: 800;
+    }
+    #layersMount{
+      padding: 12px 14px;
+      overflow: auto;
+      flex: 1;
+    }
+    .sidebarFooter{
+      padding: 12px 14px;
+      border-top: 1px solid var(--border);
+    }
+
+    /* sembunyikan layers control default (kan kita pindah ke sidebar) */
+    .leaflet-top.leaflet-right .leaflet-control-layers { display:none !important; }
+    .leaflet-control-attribution { display:none !important; }
+
+    /* legend hide/show ikut checklist */
+    .leaflet-control-layers label .legend-body{
+      display: block;
+      margin-left: 22px;
+      margin-top: 6px;
+    }
+    .leaflet-control-layers label.legend-off .legend-body{
+      display: none !important;
+    }
+
+    /* sidebar collapse */
+    body.sidebar-collapsed{ --sidebar-w: 56px; }
+    body.sidebar-collapsed #appSidebar{ width: 56px !important; }
+    body.sidebar-collapsed #map{ left: 56px !important; }
+    body.sidebar-collapsed .sidebarHeadTitle span:last-child{ display:none !important; }
+
+    body.sidebar-collapsed #layersMount{
+      display:block !important;
+      padding: 10px 6px !important;
+    }
+
+    /* saat collapsed: sembunyikan teks label layer, sisakan checkbox */
+    body.sidebar-collapsed #layersMount label span,
+    body.sidebar-collapsed #layersMount .leaflet-control-layers-tree label .leaflet-layerstree-header-name{
+      display:none !important;
+    }
+
+    body.sidebar-collapsed #layersMount label{
+      display:flex !important;
+      justify-content:center !important;
+      gap:0 !important;
+    }
+
+    body.sidebar-collapsed #layersMount input[type="checkbox"],
+    body.sidebar-collapsed #layersMount input[type="radio"]{
+      transform: scale(1.05);
+    }
+
+    /* tombol collapse (normal: teks collapse tampil) */
+    #btnCollapse{
+      width: 100%;
+      border: 1px solid var(--border);
+      background: #fff;
+      padding: 10px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      font-size: 16px;
+      font-weight: 700;
+    }
+    #btnCollapse:hover{ background: #f2f2f2; }
+
+    /* logo kecil di tombol collapse */
+    .collapseLogo{
+      width: 22px;
+      height: 22px;
+      object-fit: contain;
+      display:none;
+    }
+
+    /* saat collapsed: teks hilang, tinggal logo */
+    body.sidebar-collapsed .sidebarFooter{
+      display: flex;
+      justify-content: center;
+      padding: 12px 0;
+    }
+    body.sidebar-collapsed #btnCollapse{
+      width: 40px;
+      height: 40px;
+      padding: 0;
+      border-radius: 8px;
+    }
+    body.sidebar-collapsed #btnCollapse .btnText{ display: none; }
+    body.sidebar-collapsed #btnCollapse i{ display:none; }
+    body.sidebar-collapsed #btnCollapse .collapseLogo{ display:block; }
+
+    /* Info panel kanan */
+    .infoPanel{
+      position: fixed;
+      top: var(--header-h);
+      right: 0;
+      bottom: 0;
+      width: 420px;
+      background: #fff;
+      border-left: 1px solid var(--border);
+      z-index: 2800;
+      display: flex;
+      flex-direction: column;
+    }
+    .infoPanel.hidden{ display:none; }
+
+    .infoHeader{
+      display:flex;
+      justify-content: space-between;
+      align-items:center;
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--border);
+    }
+    .infoTitle{ font-size: 22px; font-weight: 800; }
+    .infoClose{
+      font-size: 24px;
+      border: none;
+      background: none;
+      cursor: pointer;
+      line-height: 1;
+    }
+    .infoBody{ padding: 12px 14px; overflow-y: auto; }
+    .infoHint{ font-size: 12px; color: #666; }
+
+    .infoTopName{
+      font-size: 20px;
+      font-weight: 900;
+      margin: 6px 0 12px;
+    }
+
+    .infoSubTitle{
+      font-size: 14px;
+      font-weight: 800;
+      margin: 10px 0 8px;
+      opacity: .85;
+    }
+
+    .infoRow{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin: 10px 0;
+      align-items: baseline;
+    }
+    .infoLabel{ font-weight: 800; font-size: 14px; }
+    .infoValue{ font-size: 14px; color: #333; text-align:right; }
+
+    .infoNarrative{
+        font-size:14px;
+        line-height:1.55;
+        color:#333;
+        text-align: justify;
+        text-justify: inter-word;
+    }
+
+    .infoImg{
+      width: 100%;
+      height: auto;
+      border: 1px solid rgba(0,0,0,.08);
+      border-radius: 10px;
+      margin-top: 6px;
+    }
+    body.info-open #map{ right: 420px !important; }
+
+    /* rapikan control di sidebar */
+    #layersMount .leaflet-control{
+      position: static !important;
+      margin: 0 !important;
+      box-shadow: none !important;
+      border: 0 !important;
+      background: transparent !important;
+    }
+
+    /* agar tree lebih nyaman */
+    .leaflet-layerstree-header-name{ font-weight: 800; }
+    .leaflet-layerstree-children{ margin-left: 14px; }
+    .leaflet-control-layers,
+    .leaflet-control-layers *{
+    font-family: 'Times New Roman', Times, serif;
+    }
+
+    .leaflet-layerstree-header-name{ font-size:15px; font-weight:500; }
+    .leaflet-control-layers label{ font-size:12px; font-weight:400; }
+
+    
+    /* Leaflet layers biasa */
+    .leaflet-control-layers label{
+    display: flex !important;
+    align-items: flex-start !important;
+    gap: 8px;
+    white-space: normal !important;   /* boleh wrap */
+    }
+
+    /* Checkbox/radio jangan ikut melebar */
+    .leaflet-control-layers label > input{
+    flex: 0 0 auto !important;
+    margin-top: 4px;                 /* agar sejajar baseline teks */
+    }
+
+    /* Bagian teksnya yang boleh wrap */
+    .leaflet-control-layers label > span,
+    .leaflet-control-layers label{
+    flex: 1 1 auto;
+    }
+
+    /* ====== KHUSUS L.Control.Layers.Tree (tree panel) ====== */
+    .leaflet-layerstree-node label{
+    display: flex !important;
+    align-items: flex-start !important;
+    gap: 8px;
+    white-space: normal !important;
+    }
+
+    .leaflet-layerstree-node label > input{
+    flex: 0 0 auto !important;
+    margin-top: 4px;
+    }
+
+    .leaflet-layerstree-node label > span{
+    flex: 1 1 auto !important;
+    display: block;
+    }
+
+  body.sidebar-collapsed #layersMount{ overflow-x:hidden !important; }
+
+  body.sidebar-collapsed #layersMount .leaflet-layerstree-node label,
+  body.sidebar-collapsed #layersMount .leaflet-layerstree-header,
+  body.sidebar-collapsed #layersMount .leaflet-control-layers label{
+    font-size: 0 !important;
+    line-height: 0 !important;
+    color: transparent !important;
+  }
+
+  body.sidebar-collapsed #layersMount input[type="checkbox"],
+  body.sidebar-collapsed #layersMount input[type="radio"]{
+    transform: scale(1.1);
+    margin: 6px auto !important;
+  }
+
+  </style>
+</head>
+
+<body>
+  <header id="appHeader">
+    <div class="appLeft">
+      <img class="appLogo" src="images/LogoUGM.png" alt="Logo UGM" />
+      <div class="appTitle">PETA KETAHANAN DAN KERENTANAN PANGAN KABUPATEN KULON PROGO</div>
+    </div>
+  </header>
+
+  <aside id="appSidebar">
+    <div class="sidebarHead">
+      <div class="sidebarHeadTitle">
+        <span>☰</span>
+        <span>Layer</span>
+      </div>
+    </div>
+
+    <div id="layersMount"></div>
+
+    <div class="sidebarFooter">
+      <button id="btnCollapse" type="button" aria-label="Collapse sidebar">
+        <i class="fas fa-sign-out-alt"></i>
+        <img class="collapseLogo" src="images/LogoUGM.png" alt="Logo" />
+        <span class="btnText">Collapse</span>
+      </button>
+    </div>
+  </aside>
+
+  <aside id="infoPanel" class="infoPanel hidden">
+    <div class="infoHeader">
+      <div class="infoTitle">Informasi</div>
+      <button id="infoClose" class="infoClose" aria-label="Close">×</button>
+    </div>
+    <div id="infoBody" class="infoBody">
+      <div class="infoHint">Klik objek pada peta untuk melihat informasi.</div>
+    </div>
+  </aside>
+
+  <div id="map"></div>
+
+  <!-- libs -->
+  <script src="js/qgis2web_expressions.js"></script>
+  <script src="js/leaflet.js"></script>
+  <script src="js/L.Control.Layers.Tree.min.js"></script>
+  <script src="js/multi-style-layer.js"></script>
+  <script src="js/leaflet.rotatedMarker.js"></script>
+  <script src="js/leaflet.pattern.js"></script>
+  <script src="js/leaflet-hash.js"></script>
+  <script src="js/Autolinker.min.js"></script>
+  <script src="js/rbush.min.js"></script>
+  <script src="js/labelgun.min.js"></script>
+  <script src="js/labels.js"></script>
+  <script src="js/leaflet.photon.js"></script>
+
+  <!-- data (SCRIPT 2) -->
+  <script src="data/RasioLuasPerkebunan_1.js"></script>
+  <script src="data/IndeksKetahananKerentanan_2.js"></script>
+  <script src="data/Angkaharapanhiduppadasaatlahir_3.js"></script>
+  <script src="data/PrevelanceBalitaStunting_4.js"></script>
+  <script src="data/Rasiojumlahpendudukpertenagakesehatanterhadaptingkatkepadatanpenduduk_5.js"></script>
+  <script src="data/Persentaserumahtanggatanpaakseskeairbersih_6.js"></script>
+  <script src="data/Rataratalamasekolahperempuandiatas15tahun_7.js"></script>
+  <script src="data/Persentaserumahtanggatanpaakseslistrik_8.js"></script>
+  <script src="data/Persentaserumahtanggadenganproporsipengeluaranuntukpanganlebihdari65terhadaptotalpengeluaran_9.js"></script>
+  <script src="data/PersentasependudukdibawahGarisKemiskinan_10.js"></script>
+  <script src="data/Rasiokosumsinormatifterhadapketeresediaanbersihperkapitaperhari_11.js"></script>
+  <script src="data/JalanLain_12.js"></script>
+  <script src="data/JalanLokal_13.js"></script>
+  <script src="data/JalanKolektor_14.js"></script>
+  <script src="data/JangkauanPasar5km_15.js"></script>
+  <script src="data/SebaranPasarTradisional_16.js"></script>
+  <script src="data/BatasKecamatan_17.js"></script>
+
+  <script>
+    // =========================
+    // MAP INIT (pakai bounds Script 2)
+    // =========================
+    var map = L.map('map', { zoomControl:false, maxZoom:28, minZoom:1 })
+      .fitBounds([[-8.243686768154406,108.82457678841777],[-7.346921326174121,110.9854950978433]]);
+
+    var hash = new L.Hash(map);
+
+    L.control.zoom({ position: 'topleft' }).addTo(map);
+
+    var bounds_group = new L.featureGroup([]);
+    function setBounds() {
+      if (bounds_group.getLayers().length) map.fitBounds(bounds_group.getBounds());
+    }
+
+    function forceLeafletRedraw(){
+      map.invalidateSize(true);
+      var op = map.getPanes().overlayPane;
+      if (op){
+        op.style.display = "none";
+        op.offsetHeight;
+        op.style.display = "";
+      }
+      if (map._renderer && map._renderer._update) map._renderer._update();
+    }
+    map.on("overlayadd", forceLeafletRedraw);
+    map.on("overlayremove", forceLeafletRedraw);
+
+    // =========================
+    // BASEMAP
+    // =========================
+    map.createPane('pane_GoogleSatellite_0');
+    map.getPane('pane_GoogleSatellite_0').style.zIndex = 400;
+    var layer_GoogleSatellite_0 = L.tileLayer('https://mt0.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+      pane: 'pane_GoogleSatellite_0',
+      opacity: 1.0,
+      attribution: '',
+      minZoom: 1,
+      maxZoom: 28,
+      minNativeZoom: 0,
+      maxNativeZoom: 18
+    });
+    map.addLayer(layer_GoogleSatellite_0);
+
+    // =========================
+    // STYLE HELPERS (diambil pola Script 2)
+    // =========================
+    function styleByPrioritas(paneName, strokeColor, fillColors, outlineOpacity){
+      outlineOpacity = (outlineOpacity === undefined ? 1.0 : outlineOpacity);
+      return function(feature){
+        var pr = String(feature.properties['Prioritas']);
+        var fc = fillColors[pr];
+        if (!fc) return { pane:paneName, opacity:outlineOpacity, color: strokeColor, weight:1.0, fill:true, fillOpacity:1, fillColor:'rgba(255,245,235,1.0)', interactive:true };
+        return { pane:paneName, opacity:outlineOpacity, color: strokeColor, dashArray:'', lineCap:'butt', lineJoin:'miter', weight:1.0, fill:true, fillOpacity:1, fillColor: fc, interactive:true };
+      }
+    }
+
+    // =========================
+    // LAYERS (SCRIPT 2)
+    // =========================
+
+
+    // 1 Indeks Ketahanan & Kerentanan
+    map.createPane('pane_IndeksKetahananKerentanan_2'); map.getPane('pane_IndeksKetahananKerentanan_2').style.zIndex = 402; map.getPane('pane_IndeksKetahananKerentanan_2').style['mix-blend-mode'] = 'normal';
+    var layer_IndeksKetahananKerentanan_2 = new L.geoJson(json_IndeksKetahananKerentanan_2, {
+      attribution:'', interactive:true, dataVar:'json_IndeksKetahananKerentanan_2', layerName:'layer_IndeksKetahananKerentanan_2', pane:'pane_IndeksKetahananKerentanan_2',
+      style: styleByPrioritas('pane_IndeksKetahananKerentanan_2','rgba(35,35,35,1.0)',{
+        '1':'rgba(255,245,235,1.0)','2':'rgba(254,224,194,1.0)','3':'rgba(253,189,131,1.0)','4':'rgba(253,146,67,1.0)','5':'rgba(238,101,17,1.0)'
+      })
+    });
+    bounds_group.addLayer(layer_IndeksKetahananKerentanan_2); map.addLayer(layer_IndeksKetahananKerentanan_2);
+
+    // 2 Rasio konsumsi normatif
+    map.createPane('pane_Rasiokosumsinormatifterhadapketeresediaanbersihperkapitaperhari_11');
+    map.getPane('pane_Rasiokosumsinormatifterhadapketeresediaanbersihperkapitaperhari_11').style.zIndex = 411;
+    map.getPane('pane_Rasiokosumsinormatifterhadapketeresediaanbersihperkapitaperhari_11').style['mix-blend-mode'] = 'normal';
+    var layer_Rasiokosumsinormatifterhadapketeresediaanbersihperkapitaperhari_11 = new L.geoJson(json_Rasiokosumsinormatifterhadapketeresediaanbersihperkapitaperhari_11, {
+      attribution:'', interactive:true, dataVar:'json_Rasiokosumsinormatifterhadapketeresediaanbersihperkapitaperhari_11',
+      layerName:'layer_Rasiokosumsinormatifterhadapketeresediaanbersihperkapitaperhari_11',
+      pane:'pane_Rasiokosumsinormatifterhadapketeresediaanbersihperkapitaperhari_11',
+      style: styleByPrioritas('pane_Rasiokosumsinormatifterhadapketeresediaanbersihperkapitaperhari_11','rgba(35,35,35,1.0)',{
+        '1':'rgba(255,245,235,1.0)','2':'rgba(254,224,194,1.0)','3':'rgba(253,189,131,1.0)','4':'rgba(253,146,67,1.0)','5':'rgba(238,101,17,1.0)','6':'rgba(194,64,2,1.0)'
+      })
+    });
+    bounds_group.addLayer(layer_Rasiokosumsinormatifterhadapketeresediaanbersihperkapitaperhari_11); map.addLayer(layer_Rasiokosumsinormatifterhadapketeresediaanbersihperkapitaperhari_11);
+    
+    // 3 Kemiskinan
+    map.createPane('pane_PersentasependudukdibawahGarisKemiskinan_10');
+    map.getPane('pane_PersentasependudukdibawahGarisKemiskinan_10').style.zIndex = 410;
+    map.getPane('pane_PersentasependudukdibawahGarisKemiskinan_10').style['mix-blend-mode'] = 'normal';
+    var layer_PersentasependudukdibawahGarisKemiskinan_10 = new L.geoJson(json_PersentasependudukdibawahGarisKemiskinan_10, {
+      attribution:'', interactive:true, dataVar:'json_PersentasependudukdibawahGarisKemiskinan_10', layerName:'layer_PersentasependudukdibawahGarisKemiskinan_10', pane:'pane_PersentasependudukdibawahGarisKemiskinan_10',
+      style: styleByPrioritas('pane_PersentasependudukdibawahGarisKemiskinan_10','rgba(35,35,35,1.0)',{
+        '1':'rgba(255,245,235,1.0)','2':'rgba(254,224,194,1.0)','3':'rgba(253,189,131,1.0)','4':'rgba(253,146,67,1.0)','5':'rgba(238,101,17,1.0)','6':'rgba(194,64,2,1.0)'
+      })
+    });
+    bounds_group.addLayer(layer_PersentasependudukdibawahGarisKemiskinan_10); map.addLayer(layer_PersentasependudukdibawahGarisKemiskinan_10);
+    
+    // 4 Pengeluaran pangan >65
+    map.createPane('pane_Persentaserumahtanggadenganproporsipengeluaranuntukpanganlebihdari65terhadaptotalpengeluaran_9');
+    map.getPane('pane_Persentaserumahtanggadenganproporsipengeluaranuntukpanganlebihdari65terhadaptotalpengeluaran_9').style.zIndex = 409;
+    map.getPane('pane_Persentaserumahtanggadenganproporsipengeluaranuntukpanganlebihdari65terhadaptotalpengeluaran_9').style['mix-blend-mode'] = 'normal';
+    var layer_Persentaserumahtanggadenganproporsipengeluaranuntukpanganlebihdari65terhadaptotalpengeluaran_9 = new L.geoJson(json_Persentaserumahtanggadenganproporsipengeluaranuntukpanganlebihdari65terhadaptotalpengeluaran_9, {
+      attribution:'', interactive:true, dataVar:'json_Persentaserumahtanggadenganproporsipengeluaranuntukpanganlebihdari65terhadaptotalpengeluaran_9',
+      layerName:'layer_Persentaserumahtanggadenganproporsipengeluaranuntukpanganlebihdari65terhadaptotalpengeluaran_9',
+      pane:'pane_Persentaserumahtanggadenganproporsipengeluaranuntukpanganlebihdari65terhadaptotalpengeluaran_9',
+      style: styleByPrioritas('pane_Persentaserumahtanggadenganproporsipengeluaranuntukpanganlebihdari65terhadaptotalpengeluaran_9','rgba(35,35,35,1.0)',{ '0':'rgba(255,245,235,1.0)' })
+    });
+    bounds_group.addLayer(layer_Persentaserumahtanggadenganproporsipengeluaranuntukpanganlebihdari65terhadaptotalpengeluaran_9); map.addLayer(layer_Persentaserumahtanggadenganproporsipengeluaranuntukpanganlebihdari65terhadaptotalpengeluaran_9);
+
+    // 4 Tanpa listrik
+    map.createPane('pane_Persentaserumahtanggatanpaakseslistrik_8'); map.getPane('pane_Persentaserumahtanggatanpaakseslistrik_8').style.zIndex = 408; map.getPane('pane_Persentaserumahtanggatanpaakseslistrik_8').style['mix-blend-mode'] = 'normal';
+    var layer_Persentaserumahtanggatanpaakseslistrik_8 = new L.geoJson(json_Persentaserumahtanggatanpaakseslistrik_8, {
+      attribution:'', interactive:true, dataVar:'json_Persentaserumahtanggatanpaakseslistrik_8', layerName:'layer_Persentaserumahtanggatanpaakseslistrik_8', pane:'pane_Persentaserumahtanggatanpaakseslistrik_8',
+      style: styleByPrioritas('pane_Persentaserumahtanggatanpaakseslistrik_8','rgba(35,35,35,0.0)',{
+        '1':'rgba(255,245,235,1.0)','2':'rgba(254,224,194,1.0)','3':'rgba(253,189,131,1.0)','4':'rgba(253,146,67,1.0)','5':'rgba(238,101,17,1.0)','6':'rgba(194,64,2,1.0)'
+      }, 1.0)
+    });
+    bounds_group.addLayer(layer_Persentaserumahtanggatanpaakseslistrik_8); map.addLayer(layer_Persentaserumahtanggatanpaakseslistrik_8);
+
+    // 5 Tanpa air bersih
+    map.createPane('pane_Persentaserumahtanggatanpaakseskeairbersih_6'); map.getPane('pane_Persentaserumahtanggatanpaakseskeairbersih_6').style.zIndex = 406; map.getPane('pane_Persentaserumahtanggatanpaakseskeairbersih_6').style['mix-blend-mode'] = 'normal';
+    var layer_Persentaserumahtanggatanpaakseskeairbersih_6 = new L.geoJson(json_Persentaserumahtanggatanpaakseskeairbersih_6, {
+      attribution:'', interactive:true, dataVar:'json_Persentaserumahtanggatanpaakseskeairbersih_6', layerName:'layer_Persentaserumahtanggatanpaakseskeairbersih_6', pane:'pane_Persentaserumahtanggatanpaakseskeairbersih_6',
+      style: styleByPrioritas('pane_Persentaserumahtanggatanpaakseskeairbersih_6','rgba(35,35,35,1.0)',{ '0':'rgba(255,245,235,1.0)' })
+    });
+    bounds_group.addLayer(layer_Persentaserumahtanggatanpaakseskeairbersih_6); map.addLayer(layer_Persentaserumahtanggatanpaakseskeairbersih_6);
+
+    // 6 RLS
+    map.createPane('pane_Rataratalamasekolahperempuandiatas15tahun_7'); map.getPane('pane_Rataratalamasekolahperempuandiatas15tahun_7').style.zIndex = 407; map.getPane('pane_Rataratalamasekolahperempuandiatas15tahun_7').style['mix-blend-mode'] = 'normal';
+    var layer_Rataratalamasekolahperempuandiatas15tahun_7 = new L.geoJson(json_Rataratalamasekolahperempuandiatas15tahun_7, {
+      attribution:'', interactive:true, dataVar:'json_Rataratalamasekolahperempuandiatas15tahun_7', layerName:'layer_Rataratalamasekolahperempuandiatas15tahun_7', pane:'pane_Rataratalamasekolahperempuandiatas15tahun_7',
+      style: styleByPrioritas('pane_Rataratalamasekolahperempuandiatas15tahun_7','rgba(35,35,35,1.0)',{ '0':'rgba(255,245,235,1.0)' })
+    });
+    bounds_group.addLayer(layer_Rataratalamasekolahperempuandiatas15tahun_7); map.addLayer(layer_Rataratalamasekolahperempuandiatas15tahun_7);
+    
+    // 7 Rasio Nakes
+    map.createPane('pane_Rasiojumlahpendudukpertenagakesehatanterhadaptingkatkepadatanpenduduk_5');
+    map.getPane('pane_Rasiojumlahpendudukpertenagakesehatanterhadaptingkatkepadatanpenduduk_5').style.zIndex = 405;
+    map.getPane('pane_Rasiojumlahpendudukpertenagakesehatanterhadaptingkatkepadatanpenduduk_5').style['mix-blend-mode'] = 'normal';
+    var layer_Rasiojumlahpendudukpertenagakesehatanterhadaptingkatkepadatanpenduduk_5 = new L.geoJson(json_Rasiojumlahpendudukpertenagakesehatanterhadaptingkatkepadatanpenduduk_5, {
+      attribution:'', interactive:true, dataVar:'json_Rasiojumlahpendudukpertenagakesehatanterhadaptingkatkepadatanpenduduk_5',
+      layerName:'layer_Rasiojumlahpendudukpertenagakesehatanterhadaptingkatkepadatanpenduduk_5',
+      pane:'pane_Rasiojumlahpendudukpertenagakesehatanterhadaptingkatkepadatanpenduduk_5',
+      style: styleByPrioritas('pane_Rasiojumlahpendudukpertenagakesehatanterhadaptingkatkepadatanpenduduk_5','rgba(35,35,35,0.0)',{
+        '1':'rgba(255,245,235,1.0)','2':'rgba(254,224,194,1.0)','3':'rgba(253,189,131,1.0)','4':'rgba(253,146,67,1.0)','5':'rgba(238,101,17,1.0)','6':'rgba(194,64,2,1.0)'
+      }, 1.0)
+    });
+    bounds_group.addLayer(layer_Rasiojumlahpendudukpertenagakesehatanterhadaptingkatkepadatanpenduduk_5); map.addLayer(layer_Rasiojumlahpendudukpertenagakesehatanterhadaptingkatkepadatanpenduduk_5);
+    
+    // 8 Stunting
+    map.createPane('pane_PrevelanceBalitaStunting_4'); map.getPane('pane_PrevelanceBalitaStunting_4').style.zIndex = 404; map.getPane('pane_PrevelanceBalitaStunting_4').style['mix-blend-mode'] = 'normal';
+    var layer_PrevelanceBalitaStunting_4 = new L.geoJson(json_PrevelanceBalitaStunting_4, {
+      attribution:'', interactive:true, dataVar:'json_PrevelanceBalitaStunting_4', layerName:'layer_PrevelanceBalitaStunting_4', pane:'pane_PrevelanceBalitaStunting_4',
+      style: styleByPrioritas('pane_PrevelanceBalitaStunting_4','rgba(35,35,35,1.0)',{ '0':'rgba(255,245,235,1.0)' })
+    });
+    bounds_group.addLayer(layer_PrevelanceBalitaStunting_4); map.addLayer(layer_PrevelanceBalitaStunting_4);
+
+    // 9 AHH
+    map.createPane('pane_Angkaharapanhiduppadasaatlahir_3'); map.getPane('pane_Angkaharapanhiduppadasaatlahir_3').style.zIndex = 403; map.getPane('pane_Angkaharapanhiduppadasaatlahir_3').style['mix-blend-mode'] = 'normal';
+    var layer_Angkaharapanhiduppadasaatlahir_3 = new L.geoJson(json_Angkaharapanhiduppadasaatlahir_3, {
+      attribution:'', interactive:true, dataVar:'json_Angkaharapanhiduppadasaatlahir_3', layerName:'layer_Angkaharapanhiduppadasaatlahir_3', pane:'pane_Angkaharapanhiduppadasaatlahir_3',
+      style: styleByPrioritas('pane_Angkaharapanhiduppadasaatlahir_3','rgba(35,35,35,1.0)',{ '0':'rgba(255,245,235,1.0)' })
+    });
+    bounds_group.addLayer(layer_Angkaharapanhiduppadasaatlahir_3); map.addLayer(layer_Angkaharapanhiduppadasaatlahir_3);
+
+    // 10 Jalan lain
+    map.createPane('pane_JalanLain_12'); map.getPane('pane_JalanLain_12').style.zIndex = 412; map.getPane('pane_JalanLain_12').style['mix-blend-mode'] = 'normal';
+    var layer_JalanLain_12 = new L.geoJson(json_JalanLain_12, {
+      attribution:'', interactive:false, dataVar:'json_JalanLain_12', layerName:'layer_JalanLain_12', pane:'pane_JalanLain_12',
+      style: function(){ return {pane:'pane_JalanLain_12',opacity:1,color:'rgba(255,153,255,1.0)',dashArray:'',lineCap:'square',lineJoin:'bevel',weight:1.0,fillOpacity:0,interactive:false}; }
+    });
+    bounds_group.addLayer(layer_JalanLain_12); map.addLayer(layer_JalanLain_12);
+
+    // 11 Jalan lokal (multi style)
+    function style_JalanLokal_13_0(){ return {pane:'pane_JalanLokal_13',opacity:1,color:'rgba(35,35,35,1.0)',dashArray:'',lineCap:'square',lineJoin:'bevel',weight:2.0,fillOpacity:0,interactive:false}; }
+    function style_JalanLokal_13_1(){ return {pane:'pane_JalanLokal_13',opacity:1,color:'rgba(255,255,255,1.0)',dashArray:'',lineCap:'square',lineJoin:'bevel',weight:1.0,fillOpacity:0,interactive:false}; }
+    map.createPane('pane_JalanLokal_13'); map.getPane('pane_JalanLokal_13').style.zIndex = 413; map.getPane('pane_JalanLokal_13').style['mix-blend-mode'] = 'normal';
+    var layer_JalanLokal_13 = new L.geoJson.multiStyle(json_JalanLokal_13, {
+      attribution:'', interactive:false, dataVar:'json_JalanLokal_13', layerName:'layer_JalanLokal_13', pane:'pane_JalanLokal_13',
+      styles:[style_JalanLokal_13_0, style_JalanLokal_13_1]
+    });
+    bounds_group.addLayer(layer_JalanLokal_13); map.addLayer(layer_JalanLokal_13);
+
+    // 12 Jalan kolektor (multi style)
+    function style_JalanKolektor_14_0(){ return {pane:'pane_JalanKolektor_14',opacity:1,color:'rgba(35,35,35,1.0)',dashArray:'',lineCap:'square',lineJoin:'bevel',weight:2.0,fillOpacity:0,interactive:false}; }
+    function style_JalanKolektor_14_1(){ return {pane:'pane_JalanKolektor_14',opacity:1,color:'rgba(250,102,250,1.0)',dashArray:'',lineCap:'square',lineJoin:'bevel',weight:1.0,fillOpacity:0,interactive:false}; }
+    map.createPane('pane_JalanKolektor_14'); map.getPane('pane_JalanKolektor_14').style.zIndex = 414; map.getPane('pane_JalanKolektor_14').style['mix-blend-mode'] = 'normal';
+    var layer_JalanKolektor_14 = new L.geoJson.multiStyle(json_JalanKolektor_14, {
+      attribution:'', interactive:false, dataVar:'json_JalanKolektor_14', layerName:'layer_JalanKolektor_14', pane:'pane_JalanKolektor_14',
+      styles:[style_JalanKolektor_14_0, style_JalanKolektor_14_1]
+    });
+    bounds_group.addLayer(layer_JalanKolektor_14); map.addLayer(layer_JalanKolektor_14);
+
+    // 13 Sebaran pasar tradisional (point)
+    map.createPane('pane_SebaranPasarTradisional_16'); map.getPane('pane_SebaranPasarTradisional_16').style.zIndex = 416; map.getPane('pane_SebaranPasarTradisional_16').style['mix-blend-mode'] = 'normal';
+    var layer_SebaranPasarTradisional_16 = new L.geoJson(json_SebaranPasarTradisional_16, {
+      attribution:'', interactive:true, dataVar:'json_SebaranPasarTradisional_16', layerName:'layer_SebaranPasarTradisional_16', pane:'pane_SebaranPasarTradisional_16',
+      pointToLayer: function(feature, latlng){
+        return L.marker(latlng, {
+          pane:'pane_SebaranPasarTradisional_16',
+          rotationAngle: 0.0174533,
+          rotationOrigin: 'center center',
+          icon: L.icon({ iconUrl:'markers/SebaranPasarTradisional_16.svg', iconSize:[15.2, 15.2] }),
+          interactive:true
+        });
+      }
+    });
+    bounds_group.addLayer(layer_SebaranPasarTradisional_16); map.addLayer(layer_SebaranPasarTradisional_16);
+    
+    // 14 Jangkauan pasar 5km
+    map.createPane('pane_JangkauanPasar5km_15'); map.getPane('pane_JangkauanPasar5km_15').style.zIndex = 415; map.getPane('pane_JangkauanPasar5km_15').style['mix-blend-mode'] = 'normal';
+    var layer_JangkauanPasar5km_15 = new L.geoJson(json_JangkauanPasar5km_15, {
+      attribution:'', interactive:true, dataVar:'json_JangkauanPasar5km_15', layerName:'layer_JangkauanPasar5km_15', pane:'pane_JangkauanPasar5km_15',
+      style: function(){ return {pane:'pane_JangkauanPasar5km_15',opacity:0.5,color:'rgba(35,35,35,1.0)',dashArray:'',lineCap:'butt',lineJoin:'miter',weight:1.0,fill:true,fillOpacity:0.5,fillColor:'rgba(133,182,111,1.0)',interactive:true}; }
+    });
+    bounds_group.addLayer(layer_JangkauanPasar5km_15); map.addLayer(layer_JangkauanPasar5km_15);
+
+    // 15 Rasio Luas Perkebunan
+    map.createPane('pane_RasioLuasPerkebunan_1'); map.getPane('pane_RasioLuasPerkebunan_1').style.zIndex = 401; map.getPane('pane_RasioLuasPerkebunan_1').style['mix-blend-mode'] = 'normal';
+    var layer_RasioLuasPerkebunan_1 = new L.geoJson(json_RasioLuasPerkebunan_1, {
+      attribution:'', interactive:true, dataVar:'json_RasioLuasPerkebunan_1', layerName:'layer_RasioLuasPerkebunan_1', pane:'pane_RasioLuasPerkebunan_1',
+      style: styleByPrioritas('pane_RasioLuasPerkebunan_1','rgba(35,35,35,1.0)',{
+        '1':'rgba(255,245,235,1.0)','2':'rgba(254,224,194,1.0)','3':'rgba(253,189,131,1.0)','4':'rgba(253,146,67,1.0)','5':'rgba(238,101,17,1.0)','6':'rgba(194,64,2,1.0)'
+      })
+    });
+    bounds_group.addLayer(layer_RasioLuasPerkebunan_1); map.addLayer(layer_RasioLuasPerkebunan_1);
+
+    // 16 Batas kecamatan (multi style)
+    function style_BatasKecamatan_17_0(){ return {pane:'pane_BatasKecamatan_17',opacity:1,color:'rgba(248,242,62,1.0)',dashArray:'',lineCap:'square',lineJoin:'bevel',weight:2.0,fillOpacity:0,interactive:false}; }
+    function style_BatasKecamatan_17_1(){ return {pane:'pane_BatasKecamatan_17',opacity:1,color:'rgba(0,0,0,1.0)',dashArray:'4.0,2.0,1.0,2.0,1.0,2.0',lineCap:'round',lineJoin:'round',weight:1.0,fillOpacity:0,interactive:false}; }
+    map.createPane('pane_BatasKecamatan_17'); map.getPane('pane_BatasKecamatan_17').style.zIndex = 417; map.getPane('pane_BatasKecamatan_17').style['mix-blend-mode'] = 'normal';
+    var layer_BatasKecamatan_17 = new L.geoJson.multiStyle(json_BatasKecamatan_17, {
+      attribution:'', interactive:false, dataVar:'json_BatasKecamatan_17', layerName:'layer_BatasKecamatan_17', pane:'pane_BatasKecamatan_17',
+      styles:[style_BatasKecamatan_17_0, style_BatasKecamatan_17_1]
+    });
+    bounds_group.addLayer(layer_BatasKecamatan_17); map.addLayer(layer_BatasKecamatan_17);
+    
+
+    // =========================
+    // TREE LAYERS CONTROL (grup seperti Script 2 + Aspek Pendukung)
+    // =========================
+
+    function legendWrap(htmlTable){
+      return '<div class="legend-body">' + htmlTable + '</div>';
+    }
+
+    var baseTree = [
+      { label: "Google Satellite", layer: layer_GoogleSatellite_0 }
+    ];
+
+    var overlaysTree = [
+      {
+        label: '<b>IKP Kabupaten Kulon Progo</b>',
+        selectAllCheckbox: true,
+        children: [
+          {label: 'Indeks Ketahanan & Kerentanan' + legendWrap('<table><tr><td style="text-align:center;"><img src="legend/IndeksKetahananKerentanan_2_10.png" /></td><td>1</td></tr><tr><td style="text-align:center;"><img src="legend/IndeksKetahananKerentanan_2_21.png" /></td><td>2</td></tr><tr><td style="text-align:center;"><img src="legend/IndeksKetahananKerentanan_2_32.png" /></td><td>3</td></tr><tr><td style="text-align:center;"><img src="legend/IndeksKetahananKerentanan_2_43.png" /></td><td>4</td></tr><tr><td style="text-align:center;"><img src="legend/IndeksKetahananKerentanan_2_54.png" /></td><td>5</td></tr></table>'), layer: layer_IndeksKetahananKerentanan_2},
+          ]
+      },
+      {
+        label: '<b>Aspek Ketersediaan Pangan</b>',
+        selectAllCheckbox: true,
+        children: [
+          {label: 'Rasio konsumsi normatif per kapita per hari' + legendWrap('<table><tr><td style="text-align:center;"><img src="legend/Rasiokosumsinormatifterhadapketeresediaanbersihperkapitaperhari_11_10.png" /></td><td>1</td></tr><tr><td style="text-align:center;"><img src="legend/Rasiokosumsinormatifterhadapketeresediaanbersihperkapitaperhari_11_21.png" /></td><td>2</td></tr><tr><td style="text-align:center;"><img src="legend/Rasiokosumsinormatifterhadapketeresediaanbersihperkapitaperhari_11_32.png" /></td><td>3</td></tr><tr><td style="text-align:center;"><img src="legend/Rasiokosumsinormatifterhadapketeresediaanbersihperkapitaperhari_11_43.png" /></td><td>4</td></tr><tr><td style="text-align:center;"><img src="legend/Rasiokosumsinormatifterhadapketeresediaanbersihperkapitaperhari_11_54.png" /></td><td>5</td></tr><tr><td style="text-align:center;"><img src="legend/Rasiokosumsinormatifterhadapketeresediaanbersihperkapitaperhari_11_65.png" /></td><td>6</td></tr></table>'), layer: layer_Rasiokosumsinormatifterhadapketeresediaanbersihperkapitaperhari_11},
+        ]
+      },
+      {
+        label: '<b>Aspek Keterjangkauan Pangan</b>',
+        selectAllCheckbox: true,
+        children: [
+          {label: 'Persentase penduduk di bawah Garis Kemiskinan' + legendWrap('<table><tr><td style="text-align:center;"><img src="legend/PersentasependudukdibawahGarisKemiskinan_10_10.png" /></td><td>1</td></tr><tr><td style="text-align:center;"><img src="legend/PersentasependudukdibawahGarisKemiskinan_10_21.png" /></td><td>2</td></tr><tr><td style="text-align:center;"><img src="legend/PersentasependudukdibawahGarisKemiskinan_10_32.png" /></td><td>3</td></tr><tr><td style="text-align:center;"><img src="legend/PersentasependudukdibawahGarisKemiskinan_10_43.png" /></td><td>4</td></tr><tr><td style="text-align:center;"><img src="legend/PersentasependudukdibawahGarisKemiskinan_10_54.png" /></td><td>5</td></tr><tr><td style="text-align:center;"><img src="legend/PersentasependudukdibawahGarisKemiskinan_10_65.png" /></td><td>6</td></tr></table>'), layer: layer_PersentasependudukdibawahGarisKemiskinan_10},
+          {label: 'Proporsi pengeluaran pangan > 65%' + legendWrap('<table><tr><td style="text-align:center;"><img src="legend/Persentaserumahtanggadenganproporsipengeluaranuntukpanganlebihdari65terhadaptotalpengeluaran_9_00.png" /></td><td>0</td></tr></table>'), layer: layer_Persentaserumahtanggadenganproporsipengeluaranuntukpanganlebihdari65terhadaptotalpengeluaran_9},
+          {label: 'Persentase RT tanpa akses listrik' + legendWrap('<table><tr><td style="text-align:center;"><img src="legend/Persentaserumahtanggatanpaakseslistrik_8_10.png" /></td><td>1</td></tr><tr><td style="text-align:center;"><img src="legend/Persentaserumahtanggatanpaakseslistrik_8_21.png" /></td><td>2</td></tr><tr><td style="text-align:center;"><img src="legend/Persentaserumahtanggatanpaakseslistrik_8_32.png" /></td><td>3</td></tr><tr><td style="text-align:center;"><img src="legend/Persentaserumahtanggatanpaakseslistrik_8_43.png" /></td><td>4</td></tr><tr><td style="text-align:center;"><img src="legend/Persentaserumahtanggatanpaakseslistrik_8_54.png" /></td><td>5</td></tr><tr><td style="text-align:center;"><img src="legend/Persentaserumahtanggatanpaakseslistrik_8_65.png" /></td><td>6</td></tr></table>'), layer: layer_Persentaserumahtanggatanpaakseslistrik_8},
+        ]
+      },
+      {
+        label: '<b>Aspek Pemanfaatan Pangan</b>',
+        selectAllCheckbox: true,
+        children: [
+          {label: 'Rata-rata lama sekolah perempuan > 15 tahun' + legendWrap('<table><tr><td style="text-align:center;"><img src="legend/Rataratalamasekolahperempuandiatas15tahun_7_00.png" /></td><td>0</td></tr></table>'), layer: layer_Rataratalamasekolahperempuandiatas15tahun_7},
+          {label: 'Persentase RT tanpa akses air bersih' + legendWrap('<table><tr><td style="text-align:center;"><img src="legend/Persentaserumahtanggatanpaakseskeairbersih_6_00.png" /></td><td>0</td></tr></table>'), layer: layer_Persentaserumahtanggatanpaakseskeairbersih_6},
+          {label: 'Rasio penduduk per tenaga kesehatan' + legendWrap('<table><tr><td style="text-align:center;"><img src="legend/Rasiojumlahpendudukpertenagakesehatanterhadaptingkatkepadatanpenduduk_5_10.png" /></td><td>1</td></tr><tr><td style="text-align:center;"><img src="legend/Rasiojumlahpendudukpertenagakesehatanterhadaptingkatkepadatanpenduduk_5_21.png" /></td><td>2</td></tr><tr><td style="text-align:center;"><img src="legend/Rasiojumlahpendudukpertenagakesehatanterhadaptingkatkepadatanpenduduk_5_32.png" /></td><td>3</td></tr><tr><td style="text-align:center;"><img src="legend/Rasiojumlahpendudukpertenagakesehatanterhadaptingkatkepadatanpenduduk_5_43.png" /></td><td>4</td></tr><tr><td style="text-align:center;"><img src="legend/Rasiojumlahpendudukpertenagakesehatanterhadaptingkatkepadatanpenduduk_5_54.png" /></td><td>5</td></tr><tr><td style="text-align:center;"><img src="legend/Rasiojumlahpendudukpertenagakesehatanterhadaptingkatkepadatanpenduduk_5_65.png" /></td><td>6</td></tr></table>'), layer: layer_Rasiojumlahpendudukpertenagakesehatanterhadaptingkatkepadatanpenduduk_5},
+          {label: 'Prevelance Balita Stunting' + legendWrap('<table><tr><td style="text-align:center;"><img src="legend/PrevelanceBalitaStunting_4_00.png" /></td><td>0</td></tr></table>'), layer: layer_PrevelanceBalitaStunting_4},
+          {label: 'Angka harapan hidup pada saat lahir' + legendWrap('<table><tr><td style="text-align:center;"><img src="legend/Angkaharapanhiduppadasaatlahir_3_00.png" /></td><td>0</td></tr></table>'), layer: layer_Angkaharapanhiduppadasaatlahir_3},          
+        ]
+      },
+      {
+        label: '<b>Aspek Pendukung</b>',
+        selectAllCheckbox: true,
+        children: [
+          {label: '<img src="legend/SebaranPasarTradisional_16.png" /> Sebaran Pasar Tradisional' + legendWrap(''), layer: layer_SebaranPasarTradisional_16},
+          {label: '<img src="legend/JangkauanPasar5km_15.png" /> Jangkauan Pasar 5km' + legendWrap(''), layer: layer_JangkauanPasar5km_15},
+          {label: '<img src="legend/JalanKolektor_14.png" /> Jalan Kolektor' + legendWrap(''), layer: layer_JalanKolektor_14},
+          {label: '<img src="legend/JalanLokal_13.png" /> Jalan Lokal' + legendWrap(''), layer: layer_JalanLokal_13},
+          {label: '<img src="legend/JalanLain_12.png" /> Jalan Lain' + legendWrap(''), layer: layer_JalanLain_12},
+          {label: '<img src="legend/BatasKecamatan_17.png" /> Batas Kecamatan' + legendWrap(''), layer: layer_BatasKecamatan_17},
+          {label: 'Rasio Luas Perkebunan' + legendWrap('<table><tr><td style="text-align:center;"><img src="legend/RasioLuasPerkebunan_1_10.png" /></td><td>1</td></tr><tr><td style="text-align:center;"><img src="legend/RasioLuasPerkebunan_1_21.png" /></td><td>2</td></tr><tr><td style="text-align:center;"><img src="legend/RasioLuasPerkebunan_1_32.png" /></td><td>3</td></tr><tr><td style="text-align:center;"><img src="legend/RasioLuasPerkebunan_1_43.png" /></td><td>4</td></tr><tr><td style="text-align:center;"><img src="legend/RasioLuasPerkebunan_1_54.png" /></td><td>5</td></tr><tr><td style="text-align:center;"><img src="legend/RasioLuasPerkebunan_1_65.png" /></td><td>6</td></tr></table>'), layer: layer_RasioLuasPerkebunan_1}
+        ]
+      },
+      {
+        label: '<b>Basemap</b>',
+        children: baseTree
+      }
+    ];
+
+    // buat tree control
+    var lay = L.control.layers.tree(null, overlaysTree, {
+      collapsed: false
+    }).addTo(map);
+
+    setBounds();
+  </script>
+
+  <script>
+    // =========================
+    // PINDAHKAN TREE CONTROL KE SIDEBAR + COLLAPSE
+    // =========================
+    (function(){
+      var ctrl = document.querySelector(".leaflet-control-layers");
+      var layersMount = document.getElementById("layersMount");
+      if (ctrl && layersMount) layersMount.appendChild(ctrl);
+
+      var btn = document.getElementById("btnCollapse");
+      if (btn) {
+        btn.addEventListener("click", function(){
+          document.body.classList.toggle("sidebar-collapsed");
+          setTimeout(function(){ map.invalidateSize(); }, 250);
+        });
+      }
+    })();
+  </script>
+
+  <script>
+    // =========================
+    // LEGEND AUTO HIDE SAAT UNCHECK
+    // =========================
+    (function(){
+      function syncLegends(){
+        document.querySelectorAll(".leaflet-control-layers label").forEach(function(label){
+          var cb = label.querySelector('input[type="checkbox"]');
+          var legend = label.querySelector(".legend-body");
+          if (!cb || !legend) return;
+          if (!cb.checked) label.classList.add("legend-off");
+          else label.classList.remove("legend-off");
+        });
+      }
+      syncLegends();
+
+      document.addEventListener("change", function(e){
+        if (e.target && (e.target.matches(".leaflet-control-layers input[type='checkbox']") || e.target.matches(".leaflet-control-layers input[type='radio']"))){
+          syncLegends();
+          setTimeout(function(){ forceLeafletRedraw(); }, 0);
+        }
+      });
+    })();
+  </script>
+
+  <script>
+  // =========================
+  // INFO PANEL + GAMBAR + TEKS NARASI (DIGABUNG)
+  // =========================
+  
+  (function(){
+    var panel = document.getElementById("infoPanel");
+    var body  = document.getElementById("infoBody");
+    var closeBtn = document.getElementById("infoClose");
+
+    function openPanel(){
+      panel.classList.remove("hidden");
+      document.body.classList.add("info-open");
+      setTimeout(function(){ map.invalidateSize(); }, 0);
+    }
+    function closePanel(){
+      panel.classList.add("hidden");
+      document.body.classList.remove("info-open");
+      setTimeout(function(){ map.invalidateSize(); }, 0);
+    }
+    closeBtn.addEventListener("click", closePanel);
+
+    function safeVal(v){
+      if (v === null || v === undefined || v === "") return "-";
+      return v;
+    }
+    function row(label, value){
+      return (
+        '<div class="infoRow">' +
+          '<div class="infoLabel">' + label + '</div>' +
+          '<div class="infoValue">' + safeVal(value) + '</div>' +
+        '</div>'
+      );
+    }
+
+    var chartByLayer = {
+      "Rasiokosumsinormatifterhadapketeresediaanbersihperkapitaperhari_11": "images/Rasio kosumsi normatif.png",
+      "PersentasependudukdibawahGarisKemiskinan_10": "images/Sebaran Penduduk dibawah Garis Kemiskinan.png",
+      "Persentaserumahtanggadenganproporsipengeluaranuntukpanganlebihdari65terhadaptotalpengeluaran_9": "images/Sebaran Ketahanan dan Kerentanan Pangan.png",
+      "Persentaserumahtanggatanpaakseslistrik_8": "images/Sebaran Rumah Tangga Tanpa Listrik.png",
+      "Rasiojumlahpendudukpertenagakesehatanterhadaptingkatkepadatanpenduduk_5": "images/Sebaran Tenaga Kesehatan dan Jumlah penduduk.png",
+      "RasioLuasPerkebunan_1": "images/Sebaran Luas Perkebunan dan Jumlah Penduduk.png",
+      "IndeksKetahananKerentanan_2": "images/IKP.png"
+    };
+
+    function imgBlock(src){
+      if (!src) return "";
+      return (
+        '<div class="infoSubTitle">Grafik</div>' +
+        '<img class="infoImg" src="' + src + '" alt="Grafik" />'
+      );
+    }
+
+    var narrativeByLayer = {
+      "Rasiokosumsinormatifterhadapketeresediaanbersihperkapitaperhari_11":
+        "Wilayah dengan nilai NCPR pada prioritas 1–2 menunjukkan kondisi defisit hingga mendekati keseimbangan energi pangan, sehingga memiliki tingkat kerentanan ketahanan pangan yang lebih tinggi. Sebaliknya, wilayah dengan NCPR di atas satu mencerminkan surplus produksi energi pangan yang relatif lebih baik dan berkontribusi positif terhadap ketahanan pangan wilayah.",
+
+      "Persentaserumahtanggatanpaakseslistrik_8":
+        "Indikator rumah tangga tanpa listrik mencerminkan dimensi infrastruktur dasar dalam kerentanan wilayah. Dominasi nilai pada prioritas 5–6 menunjukkan sebagian besar wilayah telah memiliki akses listrik yang relatif baik, sementara keberadaan wilayah pada prioritas 1 dan 2 menandakan ketimpangan akses energi yang berpotensi memperburuk kondisi sosial dan ekonomi masyarakat.",
+
+      "Rasiojumlahpendudukpertenagakesehatanterhadaptingkatkepadatanpenduduk_5":
+        "Rasio tenaga kesehatan yang rendah (prioritas 1–2) menunjukkan keterbatasan akses layanan kesehatan dan berpotensi meningkatkan kerentanan sosial wilayah. Sebaliknya, rasio tinggi (prioritas 5–6) mencerminkan ketersediaan tenaga kesehatan yang relatif memadai dan mendukung ketahanan wilayah secara non-pangan.",
+      
+      "RasioLuasPerkebunan_1":
+        "Rasio lahan perkebunan yang rendah (prioritas 1–2) menunjukkan wilayah dengan tekanan penduduk relatif tinggi terhadap sumber daya lahan, sehingga lebih rentan terhadap penurunan kapasitas produksi. Sebaliknya, rasio tinggi (prioritas 5–6) mencerminkan daya dukung lahan yang lebih baik, meskipun tetap memerlukan pengelolaan berkelanjutan.",
+
+      "IndeksKetahananKerentanan_2":
+        "Wilayah dengan prioritas tinggi (prioritas 1-2, lebih rentan) ditandai oleh rendahnya rasio ketersediaan pangan terhadap jumlah penduduk, terbatasnya akses layanan dasar seperti listrik dan tenaga kesehatan, serta tingginya tekanan sosial ekonomi. Sebaliknya, wilayah dengan prioritas rendah (prioritas 5-6, lebih tahan) menunjukkan kondisi surplus pangan relatif, akses infrastruktur yang lebih baik, dan kapasitas adaptif masyarakat yang lebih tinggi."
+    };
+
+    function narrativeBlock(layerKey){
+    var txt = narrativeByLayer[layerKey];
+    if (!txt) return "";
+    return (
+        '<div class="infoSubTitle">Keterangan</div>' +
+        '<div class="infoNarrative">' + txt + '</div>'
+        );
+    }
+
+
+    function getLayerKeyFromParent(parentLayer){
+      var ln = (parentLayer && parentLayer.options && parentLayer.options.layerName) ? parentLayer.options.layerName : "";
+      return ln.startsWith("layer_") ? ln.replace(/^layer_/, "") : ln;
+    }
+
+    function renderGeneric(title, props, fields, layerKey){
+      var html = '<div class="infoTopName">' + safeVal(title) + '</div>';
+      fields.forEach(function(f){
+        html += row(f.label, props[f.key]);
+      });
+      html += imgBlock(chartByLayer[layerKey]);
+      html += narrativeBlock(layerKey);
+      body.innerHTML = html;
+      openPanel();
+    }
+
+    // ====== FIX UTAMA: hookLayer menerima parent layer dan kirim layerKey dari parent ======
+    function hookLayer(parentLayer, getTitle, fields){
+      if (!parentLayer) return;
+      var parentKey = getLayerKeyFromParent(parentLayer);
+
+      parentLayer.eachLayer(function(l){
+        l.on("click", function(){
+          var p = (l.feature && l.feature.properties) ? l.feature.properties : {};
+          renderGeneric(getTitle(p), p, fields, parentKey);
+        });
+      });
+    }
+
+    // =========================
+    // HOOK SEMUA LAYER YANG PERLU INFO
+    // =========================
+
+    hookLayer(layer_RasioLuasPerkebunan_1,
+      function(p){ return p.Kecamatan || p.WADMKC || p.NAMOBJ || "Objek"; },
+      [{label:"Rasio", key:"Rasio"},{label:"Prioritas", key:"Prioritas"}]
+    );
+
+    hookLayer(layer_IndeksKetahananKerentanan_2,
+      function(p){ return p.Kecamatan || p.WADMKC || p.NAMOBJ || "Objek"; },
+      [
+        {label:"Prioritas", key:"Prioritas"},
+        {label:"NCPR", key:"NCPR"},
+        {label:"Kemiskinan", key:"Kemiskinan"},
+        {label:"PngluarnPg", key:"PngluarnPg"},
+        {label:"TnpListrik", key:"TnpListrik"},
+        {label:"RLS", key:"RLS"},
+        {label:"TnpAirBrsh", key:"TnpAirBrsh"},
+        {label:"RasioNakes", key:"RasioNakes"},
+        {label:"Stunting", key:"Stunting"},
+        {label:"AHH(tahun)", key:"AHH(tahun)"}
+      ]
+    );
+
+    hookLayer(layer_Angkaharapanhiduppadasaatlahir_3,
+      function(p){ return p.Kecamatan || "Objek"; },
+      [{label:"AHH", key:"AHH"},{label:"Prioritas", key:"Prioritas"}]
+    );
+
+    hookLayer(layer_PrevelanceBalitaStunting_4,
+      function(p){ return p.Kecamatan || "Objek"; },
+      [{label:"Prevalence", key:"Prevalence"},{label:"Prioritas", key:"Prioritas"}]
+    );
+
+    hookLayer(layer_Rasiojumlahpendudukpertenagakesehatanterhadaptingkatkepadatanpenduduk_5,
+      function(p){ return p.Kecamatan || "Objek"; },
+      [{label:"Rasio", key:"Rasio"},{label:"Prioritas", key:"Prioritas"}]
+    );
+
+    hookLayer(layer_Persentaserumahtanggatanpaakseskeairbersih_6,
+      function(p){ return p.Kecamatan || "Objek"; },
+      [{label:"Persentase", key:"Presentase"},{label:"Prioritas", key:"Prioritas"}]
+    );
+
+    hookLayer(layer_Rataratalamasekolahperempuandiatas15tahun_7,
+      function(p){ return p.Kecamatan || "Objek"; },
+      [{label:"RLS", key:"RLS"},{label:"Prioritas", key:"Prioritas"}]
+    );
+
+    hookLayer(layer_Persentaserumahtanggatanpaakseslistrik_8,
+      function(p){ return p.Kecamatan || "Objek"; },
+      [{label:"Persentase", key:"Presentase"},{label:"Prioritas", key:"Prioritas"}]
+    );
+
+    hookLayer(layer_Persentaserumahtanggadenganproporsipengeluaranuntukpanganlebihdari65terhadaptotalpengeluaran_9,
+      function(p){ return p.Kecamatan || "Objek"; },
+      [{label:"Persentase", key:"Presentase"},{label:"Prioritas", key:"Prioritas"}]
+    );
+
+    hookLayer(layer_PersentasependudukdibawahGarisKemiskinan_10,
+      function(p){ return p.Kecamatan || "Objek"; },
+      [{label:"Persentase", key:"Presentase"},{label:"Prioritas", key:"Prioritas"}]
+    );
+
+    hookLayer(layer_Rasiokosumsinormatifterhadapketeresediaanbersihperkapitaperhari_11,
+      function(p){ return p.Kecamatan || "Objek"; },
+      [{label:"Rasio", key:"Rasio"},{label:"Prioritas", key:"Prioritas"}]
+    );
+
+    // aspek pendukung (tidak perlu narasi)
+    hookLayer(layer_JangkauanPasar5km_15,
+      function(p){ return p.Nama || "Jangkauan Pasar"; },
+      [{label:"Nama", key:"Nama"}]
+    );
+
+    hookLayer(layer_SebaranPasarTradisional_16,
+      function(p){ return p.Nama || "Pasar Tradisional"; },
+      [{label:"Nama", key:"Nama"}]
+    );
+
+  })();
+
+  </script>
+
+</body>
+</html>
